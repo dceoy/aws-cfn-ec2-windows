@@ -179,7 +179,8 @@ Resources:
 
           # Fetch the latest winget release from GitHub
           [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-          $releaseInfo = Invoke-RestMethod -Uri "https://api.github.com/repos/microsoft/winget-cli/releases/latest" -UseBasicParsing
+          $wingetApiUrl = "https://api.github.com/repos/microsoft/winget-cli/releases/latest"
+          $releaseInfo = Invoke-RestMethod -Uri $wingetApiUrl -UseBasicParsing
           $msixUrl = ($releaseInfo.assets | Where-Object { $_.name -match '\.msixbundle$' }).browser_download_url
           $licenseUrl = ($releaseInfo.assets | Where-Object { $_.name -match 'License.*\.xml$' }).browser_download_url
 
@@ -189,7 +190,8 @@ Resources:
           # Download dependencies (VCLibs and Microsoft.UI.Xaml)
           Invoke-WebRequest -Uri "https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx" `
             -OutFile "$dependenciesDir\VCLibs.appx" -UseBasicParsing
-          $uiXamlRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/microsoft/microsoft-ui-xaml/releases?per_page=50" -UseBasicParsing
+          $uiXamlApiUrl = "https://api.github.com/repos/microsoft/microsoft-ui-xaml/releases?per_page=50"
+          $uiXamlRelease = Invoke-RestMethod -Uri $uiXamlApiUrl -UseBasicParsing
           $uiXaml2x = $uiXamlRelease | Where-Object { $_.tag_name -match '^v2\.' } | Select-Object -First 1
           $uiXamlUrl = ($uiXaml2x.assets | Where-Object { $_.name -match 'x64.*\.appx$' }).browser_download_url
           Invoke-WebRequest -Uri $uiXamlUrl -OutFile "$dependenciesDir\UIXaml.appx" -UseBasicParsing
@@ -201,7 +203,9 @@ Resources:
             -DependencyPackagePath "$dependenciesDir\VCLibs.appx","$dependenciesDir\UIXaml.appx"
 
           # Add winget to the PATH for the current session
-          $wingetDir = (Get-ChildItem -Path "$env:ProgramFiles\WindowsApps" -Filter "Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe" -Directory |
+          $wingetFilter = "Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe"
+          $wingetAppsDir = "$env:ProgramFiles\WindowsApps"
+          $wingetDir = (Get-ChildItem -Path $wingetAppsDir -Filter $wingetFilter -Directory |
             Sort-Object Name -Descending | Select-Object -First 1).FullName
           if ($wingetDir) {
             $env:Path += ";$wingetDir"
@@ -235,7 +239,9 @@ Resources:
           Remove-Item -Path $mt5Installer -Force -ErrorAction SilentlyContinue
 
           # Signal CloudFormation
-          cfn-signal.exe --exit-code $mt5ExitCode --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+          cfn-signal.exe --exit-code $mt5ExitCode `
+            --stack ${AWS::StackName} --resource Ec2Instance `
+            --region ${AWS::Region}
           </powershell>
       Tags:
         - Key: Name

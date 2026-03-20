@@ -4,7 +4,16 @@ AWS CloudFormation template for Windows Server on Amazon EC2
 
 ## Overview
 
-This repository provides a CloudFormation template that launches a Windows Server 2022 EC2 instance pre-configured for [MetaTrader 5](https://www.metatrader5.com/). The template handles networking (security group with RDP access), IAM (SSM-managed instance role), and automated MetaTrader 5 installation via a PowerShell UserData script.
+This repository provides a CloudFormation template that launches a Windows Server 2022 EC2 instance pre-configured for [MetaTrader 5](https://www.metatrader5.com/). The template handles networking (security group with RDP access), IAM (SSM-managed instance role), and automated software installation via a PowerShell UserData script. It installs [winget](https://github.com/microsoft/winget-cli) (Windows Package Manager) and uses it to provision the following tools:
+
+- Windows Terminal
+- PowerShell
+- Vim
+- Visual Studio Code
+- PowerToys
+- Git
+- uv
+- Google Chrome
 
 ## Template
 

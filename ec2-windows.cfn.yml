@@ -147,25 +147,72 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           <powershell>
-          # --- MetaTrader 5 Installation Script ---
-
           $ErrorActionPreference = "Continue"
-          $mt5Installer = "$env:TEMP\mt5setup.exe"
 
-          # Download the MetaTrader 5 installer
+          # --- Install winget (Windows Package Manager) ---
+          $wingetBundle = "$env:TEMP\Microsoft.DesktopAppInstaller.msixbundle"
+          $wingetLicense = "$env:TEMP\License1.xml"
+          $dependenciesDir = "$env:TEMP\winget-deps"
+          New-Item -ItemType Directory -Path $dependenciesDir -Force | Out-Null
+
+          # Fetch the latest winget release from GitHub
           [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          $releaseInfo = Invoke-RestMethod -Uri "https://api.github.com/repos/microsoft/winget-cli/releases/latest" -UseBasicParsing
+          $msixUrl = ($releaseInfo.assets | Where-Object { $_.name -match '\.msixbundle$' }).browser_download_url
+          $licenseUrl = ($releaseInfo.assets | Where-Object { $_.name -match 'License.*\.xml$' }).browser_download_url
+
+          Invoke-WebRequest -Uri $msixUrl -OutFile $wingetBundle -UseBasicParsing
+          Invoke-WebRequest -Uri $licenseUrl -OutFile $wingetLicense -UseBasicParsing
+
+          # Download dependencies (VCLibs and Microsoft.UI.Xaml)
+          Invoke-WebRequest -Uri "https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx" `
+            -OutFile "$dependenciesDir\VCLibs.appx" -UseBasicParsing
+          $uiXamlRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/microsoft/microsoft-ui-xaml/releases?per_page=50" -UseBasicParsing
+          $uiXaml2x = $uiXamlRelease | Where-Object { $_.tag_name -match '^v2\.' } | Select-Object -First 1
+          $uiXamlUrl = ($uiXaml2x.assets | Where-Object { $_.name -match 'x64.*\.appx$' }).browser_download_url
+          Invoke-WebRequest -Uri $uiXamlUrl -OutFile "$dependenciesDir\UIXaml.appx" -UseBasicParsing
+
+          # Install winget with dependencies
+          Add-AppxProvisionedPackage -Online `
+            -PackagePath $wingetBundle `
+            -LicensePath $wingetLicense `
+            -DependencyPackagePath "$dependenciesDir\VCLibs.appx","$dependenciesDir\UIXaml.appx"
+
+          # Add winget to the PATH for the current session
+          $wingetDir = (Get-ChildItem -Path "$env:ProgramFiles\WindowsApps" -Filter "Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe" -Directory |
+            Sort-Object Name -Descending | Select-Object -First 1).FullName
+          if ($wingetDir) {
+            $env:Path += ";$wingetDir"
+          }
+
+          # Clean up winget installer files
+          Remove-Item -Path $wingetBundle, $wingetLicense -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path $dependenciesDir -Recurse -Force -ErrorAction SilentlyContinue
+
+          # --- Install packages with winget ---
+          $packages = @(
+            "Microsoft.WindowsTerminal",
+            "Microsoft.PowerShell",
+            "vim.vim",
+            "Microsoft.VisualStudioCode",
+            "Microsoft.PowerToys",
+            "Git.Git",
+            "astral-sh.uv",
+            "Google.Chrome"
+          )
+          foreach ($pkg in $packages) {
+            winget install --id $pkg --exact --silent --accept-package-agreements --accept-source-agreements
+          }
+
+          # --- MetaTrader 5 Installation ---
+          $mt5Installer = "$env:TEMP\mt5setup.exe"
           Invoke-WebRequest -Uri "https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe" `
             -OutFile $mt5Installer -UseBasicParsing
-
-          # Install MetaTrader 5 silently and capture its exit code
-          $proc = Start-Process -FilePath $mt5Installer -ArgumentList "/auto" `
-            -PassThru -Wait
+          $proc = Start-Process -FilePath $mt5Installer -ArgumentList "/auto" -PassThru -Wait
           $mt5ExitCode = $proc.ExitCode
-
-          # Clean up the installer
           Remove-Item -Path $mt5Installer -Force -ErrorAction SilentlyContinue
 
-          # Signal CloudFormation with the installer exit code
+          # Signal CloudFormation
           cfn-signal.exe --exit-code $mt5ExitCode --stack ${AWS::StackName} --resource Instance --region ${AWS::Region}
           </powershell>
       Tags:

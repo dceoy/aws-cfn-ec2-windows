@@ -51,10 +51,10 @@ Parameters:
 
   KeyPairName:
     Description: >-
-      Name of an existing EC2 key pair for decrypting the Windows
-      administrator password.  Leave empty to skip key pair assignment.
-    Type: String
-    Default: ""
+      Name of an existing EC2 key pair used to decrypt the initial Windows
+      Administrator password for RDP login.  Required — without it the
+      password cannot be retrieved from the EC2 console.
+    Type: AWS::EC2::KeyPair::KeyName
 
   RdpCidr:
     Description: >-
@@ -73,17 +73,12 @@ Parameters:
     MaxValue: 1000
 
   VolumeType:
-    Description: Root EBS volume type
+    Description: Root EBS volume type (io1/io2 are omitted; they require Iops)
     Type: String
     Default: gp3
     AllowedValues:
       - gp3
       - gp2
-      - io1
-      - io2
-
-Conditions:
-  HasKeyPair: !Not [!Equals [!Ref KeyPairName, ""]]
 
 Resources:
   SecurityGroup:
@@ -114,7 +109,6 @@ Resources:
   InstanceRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${ProjectName}-ec2-role"
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -128,7 +122,6 @@ Resources:
   InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
-      InstanceProfileName: !Sub "${ProjectName}-ec2-profile"
       Roles:
         - !Ref InstanceRole
 
@@ -141,7 +134,7 @@ Resources:
       SecurityGroupIds:
         - !Ref SecurityGroup
       IamInstanceProfile: !Ref InstanceProfile
-      KeyName: !If [HasKeyPair, !Ref KeyPairName, !Ref "AWS::NoValue"]
+      KeyName: !Ref KeyPairName
       MetadataOptions:
         HttpTokens: required
         HttpEndpoint: enabled
@@ -164,14 +157,16 @@ Resources:
           Invoke-WebRequest -Uri "https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe" `
             -OutFile $mt5Installer -UseBasicParsing
 
-          # Install MetaTrader 5 silently
-          Start-Process -FilePath $mt5Installer -ArgumentList "/auto" -Wait
+          # Install MetaTrader 5 silently and capture its exit code
+          $proc = Start-Process -FilePath $mt5Installer -ArgumentList "/auto" `
+            -PassThru -Wait
+          $mt5ExitCode = $proc.ExitCode
 
           # Clean up the installer
           Remove-Item -Path $mt5Installer -Force -ErrorAction SilentlyContinue
 
-          # Signal cfn-init completion
-          cfn-signal.exe --exit-code $LASTEXITCODE --stack ${AWS::StackName} --resource Instance --region ${AWS::Region}
+          # Signal CloudFormation with the installer exit code
+          cfn-signal.exe --exit-code $mt5ExitCode --stack ${AWS::StackName} --resource Instance --region ${AWS::Region}
           </powershell>
       Tags:
         - Key: Name

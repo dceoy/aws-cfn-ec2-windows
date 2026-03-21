@@ -1,9 +1,0 @@
-# AVD-AWS-0107: Security group allows unrestricted RDP ingress.
-# The RdpCidr parameter has no default and requires an explicit CIDR at
-# deploy time.  Trivy cannot evaluate runtime parameter values statically.
-AVD-AWS-0107
-
-# AVD-AWS-0028: IMDSv2 not enforced.
-# MetadataOptions with HttpTokens=required is set in the template.
-# Trivy does not parse the CloudFormation MetadataOptions property correctly.
-AVD-AWS-0028

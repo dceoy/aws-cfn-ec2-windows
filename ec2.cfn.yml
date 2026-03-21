@@ -5,32 +5,27 @@ Description: >-
   MetaTrader 5.  The instance is accessible via AWS Systems Manager
   Session Manager and installs MetaTrader 5 automatically on first
   boot using a PowerShell UserData script.
-
 Parameters:
   SystemName:
     Description: System name used for resource naming and tagging
     Type: String
-    Default: win
-
+    Default: ws
   EnvType:
     Description: Environment type used for resource naming and tagging
     Type: String
     Default: dev
-
   Ec2VpcCidrBlock:
     Description: IPv4 CIDR block for the VPC
     Type: String
     Default: 10.0.0.0/16
     AllowedPattern: ^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$
     ConstraintDescription: Must be a valid CIDR block (e.g. 10.0.0.0/16).
-
   Ec2SubnetCidrBlock:
     Description: IPv4 CIDR block for the public subnet
     Type: String
     Default: 10.0.0.0/24
     AllowedPattern: ^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$
     ConstraintDescription: Must be a valid CIDR block (e.g. 10.0.0.0/24).
-
   Ec2InstanceType:
     Description: EC2 instance type
     Type: String
@@ -52,21 +47,18 @@ Parameters:
       - c6i.large
       - c6i.xlarge
       - c6i.2xlarge
-
   Ec2WindowsAmiId:
     Description: >-
       SSM parameter path for the Windows Server AMI ID.  Defaults to
       the latest Windows Server 2022 English Full Base AMI.
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base
-
   Ec2VolumeSize:
     Description: Root EBS volume size in GiB
     Type: Number
     Default: 100
     MinValue: 50
     MaxValue: 1000
-
   Ec2VolumeType:
     Description: Root EBS volume type (io1/io2 are omitted; they require Iops)
     Type: String
@@ -74,7 +66,6 @@ Parameters:
     AllowedValues:
       - gp3
       - gp2
-
 Resources:
   Ec2Vpc:
     Type: AWS::EC2::VPC
@@ -89,13 +80,11 @@ Resources:
           Value: !Ref SystemName
         - Key: EnvType
           Value: !Ref EnvType
-
   Ec2Ipv6CidrBlock:
     Type: AWS::EC2::VPCCidrBlock
     Properties:
       VpcId: !Ref Ec2Vpc
       AmazonProvidedIpv6CidrBlock: true
-
   Ec2Subnet:
     Type: AWS::EC2::Subnet
     DependsOn: Ec2Ipv6CidrBlock
@@ -113,7 +102,6 @@ Resources:
           Value: !Ref SystemName
         - Key: EnvType
           Value: !Ref EnvType
-
   Ec2InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
@@ -124,18 +112,15 @@ Resources:
           Value: !Ref SystemName
         - Key: EnvType
           Value: !Ref EnvType
-
   Ec2VpcGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
       VpcId: !Ref Ec2Vpc
       InternetGatewayId: !Ref Ec2InternetGateway
-
   Ec2EgressOnlyInternetGateway:
     Type: AWS::EC2::EgressOnlyInternetGateway
     Properties:
       VpcId: !Ref Ec2Vpc
-
   Ec2RouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -147,7 +132,6 @@ Resources:
           Value: !Ref SystemName
         - Key: EnvType
           Value: !Ref EnvType
-
   Ec2RouteIpv4Default:
     Type: AWS::EC2::Route
     DependsOn: Ec2VpcGatewayAttachment
@@ -155,20 +139,17 @@ Resources:
       RouteTableId: !Ref Ec2RouteTable
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref Ec2InternetGateway
-
   Ec2RouteIpv6Default:
     Type: AWS::EC2::Route
     Properties:
       RouteTableId: !Ref Ec2RouteTable
       DestinationIpv6CidrBlock: ::/0
       EgressOnlyInternetGatewayId: !Ref Ec2EgressOnlyInternetGateway
-
   Ec2SubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref Ec2Subnet
       RouteTableId: !Ref Ec2RouteTable
-
   Ec2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -182,7 +163,6 @@ Resources:
           Value: !Ref SystemName
         - Key: EnvType
           Value: !Ref EnvType
-
   IamRole:
     Type: AWS::IAM::Role
     Properties:
@@ -203,14 +183,12 @@ Resources:
           Value: !Ref SystemName
         - Key: EnvType
           Value: !Ref EnvType
-
   IamInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
       InstanceProfileName: !Sub "${SystemName}-${EnvType}-iam-instance-profile"
       Roles:
         - !Ref IamRole
-
   Ec2Instance:
     Type: AWS::EC2::Instance
     DependsOn: Ec2RouteIpv4Default
@@ -320,36 +298,28 @@ Resources:
     CreationPolicy:
       ResourceSignal:
         Timeout: PT30M
-
 Outputs:
   Ec2VpcId:
     Description: VPC ID
     Value: !Ref Ec2Vpc
-
   Ec2SubnetId:
     Description: Subnet ID
     Value: !Ref Ec2Subnet
-
   Ec2InstanceId:
     Description: EC2 instance ID
     Value: !Ref Ec2Instance
-
   Ec2PrivateIp:
     Description: Private IP address of the instance
     Value: !GetAtt Ec2Instance.PrivateIp
-
   Ec2PublicIp:
     Description: Public IP address of the instance
     Value: !GetAtt Ec2Instance.PublicIp
-
   Ec2SecurityGroupId:
     Description: Security group ID
     Value: !Ref Ec2SecurityGroup
-
   Ec2InternetGatewayId:
     Description: Internet gateway ID
     Value: !Ref Ec2InternetGateway
-
   Ec2EgressOnlyInternetGatewayId:
     Description: Egress-only internet gateway ID
     Value: !Ref Ec2EgressOnlyInternetGateway

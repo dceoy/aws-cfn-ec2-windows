@@ -1,10 +1,10 @@
 ---
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
-  CloudFormation template to launch a Windows Server EC2 instance for
-  MetaTrader 5.  The instance is accessible via AWS Systems Manager
-  Session Manager and installs MetaTrader 5 automatically on first
-  boot using a PowerShell UserData script.
+  CloudFormation template to launch a Windows Server EC2 instance.
+  The instance is accessible via AWS Systems Manager Session Manager
+  and installs Windows Package Manager (winget) automatically
+  on first boot using a PowerShell UserData script.
 Parameters:
   SystemName:
     Description: System name used for resource naming and tagging
@@ -29,24 +29,22 @@ Parameters:
   Ec2InstanceType:
     Description: EC2 instance type
     Type: String
-    Default: t3.large
+    Default: t3a.medium
     AllowedValues:
+      - t3.nano
+      - t3.micro
+      - t3.small
       - t3.medium
       - t3.large
       - t3.xlarge
       - t3.2xlarge
-      - m5.large
-      - m5.xlarge
-      - m5.2xlarge
-      - m6i.large
-      - m6i.xlarge
-      - m6i.2xlarge
-      - c5.large
-      - c5.xlarge
-      - c5.2xlarge
-      - c6i.large
-      - c6i.xlarge
-      - c6i.2xlarge
+      - t3a.nano
+      - t3a.micro
+      - t3a.small
+      - t3a.medium
+      - t3a.large
+      - t3a.xlarge
+      - t3a.2xlarge
   Ec2WindowsAmiId:
     Description: >-
       SSM parameter path for the Windows Server AMI ID.  Defaults to
@@ -56,9 +54,9 @@ Parameters:
   Ec2VolumeSize:
     Description: Root EBS volume size in GiB
     Type: Number
-    Default: 100
-    MinValue: 50
-    MaxValue: 1000
+    Default: 64
+    MinValue: 16
+    MaxValue: 1024
   Ec2VolumeType:
     Description: Root EBS volume type (io1/io2 are omitted; they require Iops)
     Type: String

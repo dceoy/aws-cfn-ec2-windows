@@ -109,6 +109,36 @@ Resources:
     Properties:
       SubnetId: !Ref Ec2Subnet
       RouteTableId: !Ref Ec2RouteTable
+  Ec2VpcS3GatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Ec2Vpc
+      VpcEndpointType: Gateway
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      RouteTableIds:
+        - !Ref Ec2RouteTable
+      Tags:
+        - Key: Name
+          Value: !Sub "${SystemName}-${EnvType}-ec2-s3-vpce"
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+  Ec2VpcDynamoDbGatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Ec2Vpc
+      VpcEndpointType: Gateway
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.dynamodb"
+      RouteTableIds:
+        - !Ref Ec2RouteTable
+      Tags:
+        - Key: Name
+          Value: !Sub "${SystemName}-${EnvType}-ec2-dynamodb-vpce"
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
   Ec2NetworkAcl:
     Type: AWS::EC2::NetworkAcl
     Properties:
@@ -249,3 +279,9 @@ Outputs:
   Ec2EgressOnlyInternetGatewayId:
     Description: Egress-only internet gateway ID
     Value: !Ref Ec2EgressOnlyInternetGateway
+  Ec2VpcS3GatewayEndpointId:
+    Description: S3 gateway VPC endpoint ID
+    Value: !Ref Ec2VpcS3GatewayEndpoint
+  Ec2VpcDynamoDbGatewayEndpointId:
+    Description: DynamoDB gateway VPC endpoint ID
+    Value: !Ref Ec2VpcDynamoDbGatewayEndpoint

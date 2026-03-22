@@ -267,21 +267,35 @@ Outputs:
   Ec2VpcId:
     Description: VPC ID
     Value: !Ref Ec2Vpc
+    Export:
+      Name: !Sub "${SystemName}-${EnvType}-ec2-vpc"
   Ec2SubnetId:
     Description: Subnet ID
     Value: !Ref Ec2Subnet
+    Export:
+      Name: !Sub "${SystemName}-${EnvType}-ec2-subnet"
   Ec2SecurityGroupId:
     Description: Security group ID
     Value: !Ref Ec2SecurityGroup
+    Export:
+      Name: !Sub "${SystemName}-${EnvType}-ec2-sg"
   Ec2InternetGatewayId:
     Description: Internet gateway ID
     Value: !Ref Ec2InternetGateway
+    Export:
+      Name: !Sub "${SystemName}-${EnvType}-ec2-igw"
   Ec2EgressOnlyInternetGatewayId:
     Description: Egress-only internet gateway ID
     Value: !Ref Ec2EgressOnlyInternetGateway
+    Export:
+      Name: !Sub "${SystemName}-${EnvType}-ec2-eigw"
   Ec2VpcS3GatewayEndpointId:
     Description: S3 gateway VPC endpoint ID
     Value: !Ref Ec2VpcS3GatewayEndpoint
+    Export:
+      Name: !Sub "${SystemName}-${EnvType}-ec2-s3-vpce"
   Ec2VpcDynamoDbGatewayEndpointId:
     Description: DynamoDB gateway VPC endpoint ID
     Value: !Ref Ec2VpcDynamoDbGatewayEndpoint
+    Export:
+      Name: !Sub "${SystemName}-${EnvType}-ec2-dynamodb-vpce"

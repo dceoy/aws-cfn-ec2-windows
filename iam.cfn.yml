@@ -43,6 +43,10 @@ Outputs:
   Ec2IamInstanceProfileName:
     Description: IAM instance profile name
     Value: !Ref IamInstanceProfile
+    Export:
+      Name: !Sub "${SystemName}-${EnvType}-iam-instance-profile"
   Ec2IamRoleName:
     Description: IAM role name
     Value: !Ref IamRole
+    Export:
+      Name: !Sub "${SystemName}-${EnvType}-iam-role"

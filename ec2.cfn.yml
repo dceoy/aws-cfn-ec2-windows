@@ -2,10 +2,12 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
   CloudFormation template to launch a Windows Server EC2 instance
-  using existing networking resources and an existing IAM instance profile.
+  using existing networking resources and an existing IAM instance profile
+  imported from the companion stacks by default.
   The instance is accessible via AWS Systems Manager Session Manager
   and uses a PowerShell UserData script for first-boot bootstrap.
-  A custom UserData script can optionally be supplied at deploy time.
+  Explicit resource overrides and a custom UserData script can optionally
+  be supplied at deploy time.
 Parameters:
   SystemName:
     Description: System name used for resource naming and tagging
@@ -16,14 +18,29 @@ Parameters:
     Type: String
     Default: dev
   Ec2SubnetId:
-    Description: Existing subnet ID for the EC2 instance
-    Type: AWS::EC2::Subnet::Id
-  Ec2SecurityGroupId:
-    Description: Existing security group ID for the EC2 instance
-    Type: AWS::EC2::SecurityGroup::Id
-  Ec2IamInstanceProfileName:
-    Description: Existing IAM instance profile name from iam.cfn.yml
+    Description: >-
+      Optional subnet ID override.
+      Leave empty to import the matching subnet from the companion VPC stack.
     Type: String
+    Default: ''
+    AllowedPattern: ^$|^subnet-[0-9A-Za-z]+$
+    ConstraintDescription: Must be empty or a valid subnet ID (e.g. subnet-1234abcd).
+  Ec2SecurityGroupId:
+    Description: >-
+      Optional security group ID override.
+      Leave empty to import the matching security group from the companion VPC stack.
+    Type: String
+    Default: ''
+    AllowedPattern: ^$|^sg-[0-9A-Za-z]+$
+    ConstraintDescription: Must be empty or a valid security group ID (e.g. sg-1234abcd).
+  Ec2IamInstanceProfileName:
+    Description: >-
+      Optional IAM instance profile name override.
+      Leave empty to import the matching instance profile from the companion IAM stack.
+    Type: String
+    Default: ''
+    AllowedPattern: ^$|^[A-Za-z0-9+=,.@_-]+$
+    ConstraintDescription: Must be empty or a valid IAM instance profile name.
   Ec2InstanceType:
     Description: EC2 instance type
     Type: String
@@ -62,6 +79,21 @@ Parameters:
     Default: ''
     NoEcho: true
 Conditions:
+  HasEc2SubnetIdOverride:
+    Fn::Not:
+      - Fn::Equals:
+          - !Ref Ec2SubnetId
+          - ''
+  HasEc2SecurityGroupIdOverride:
+    Fn::Not:
+      - Fn::Equals:
+          - !Ref Ec2SecurityGroupId
+          - ''
+  HasEc2IamInstanceProfileNameOverride:
+    Fn::Not:
+      - Fn::Equals:
+          - !Ref Ec2IamInstanceProfileName
+          - ''
   HasEc2UserData:
     Fn::Not:
       - Fn::Equals:
@@ -81,16 +113,28 @@ Resources:
     Properties:
       ImageId: !Ref Ec2WindowsAmiId
       InstanceType: !Ref Ec2InstanceType
-      IamInstanceProfile: !Ref Ec2IamInstanceProfileName
+      IamInstanceProfile: !If
+        - HasEc2IamInstanceProfileNameOverride
+        - !Ref Ec2IamInstanceProfileName
+        - Fn::ImportValue:
+            Fn::Sub: "${SystemName}-${EnvType}-iam-instance-profile"
       MetadataOptions:
         HttpTokens: required
         HttpEndpoint: enabled
       NetworkInterfaces:
         - DeviceIndex: 0
-          SubnetId: !Ref Ec2SubnetId
+          SubnetId: !If
+            - HasEc2SubnetIdOverride
+            - !Ref Ec2SubnetId
+            - Fn::ImportValue:
+                Fn::Sub: "${SystemName}-${EnvType}-ec2-subnet"
           AssociatePublicIpAddress: true
           GroupSet:
-            - !Ref Ec2SecurityGroupId
+            - !If
+              - HasEc2SecurityGroupIdOverride
+              - !Ref Ec2SecurityGroupId
+              - Fn::ImportValue:
+                  Fn::Sub: "${SystemName}-${EnvType}-ec2-sg"
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
@@ -202,9 +246,15 @@ Outputs:
   Ec2InstanceId:
     Description: EC2 instance ID
     Value: !Ref Ec2Instance
+    Export:
+      Name: !Sub "${SystemName}-${EnvType}-ec2-instance"
   Ec2PrivateIp:
     Description: Private IP address of the instance
     Value: !GetAtt Ec2Instance.PrivateIp
+    Export:
+      Name: !Sub "${SystemName}-${EnvType}-ec2-instance-private-ip"
   Ec2PublicIp:
     Description: Public IP address of the instance
     Value: !GetAtt Ec2Instance.PublicIp
+    Export:
+      Name: !Sub "${SystemName}-${EnvType}-ec2-instance-public-ip"

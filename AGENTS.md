@@ -9,10 +9,10 @@ The main deliverables are [`vpc.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/
 Use the AWS CLI to deploy or update the stacks:
 
 ```bash
-aws cloudformation deploy --template-file vpc.cfn.yml --stack-name fte-dev-ec2-support
-aws cloudformation deploy --template-file iam.cfn.yml --stack-name fte-dev-ec2-iam --capabilities CAPABILITY_NAMED_IAM
-aws cloudformation deploy --template-file ec2-windows.cfn.yml --stack-name fte-dev-ec2 --parameter-overrides Ec2SubnetId=<subnet-id> Ec2SecurityGroupId=<security-group-id> Ec2IamInstanceProfileName=<instance-profile-name>
-aws cloudformation deploy --template-file ec2-ubuntu.cfn.yml --stack-name fte-dev-ec2 --parameter-overrides Ec2SubnetId=<subnet-id> Ec2SecurityGroupId=<security-group-id> Ec2IamInstanceProfileName=<instance-profile-name>
+aws cloudformation deploy --template-file vpc.cfn.yml --stack-name min-dev-ec2-vpc
+aws cloudformation deploy --template-file iam.cfn.yml --stack-name min-dev-ec2-iam --capabilities CAPABILITY_NAMED_IAM
+aws cloudformation deploy --template-file ec2-windows.cfn.yml --stack-name min-dev-ec2 --parameter-overrides Ec2SubnetId=<subnet-id> Ec2SecurityGroupId=<security-group-id> Ec2IamInstanceProfileName=<instance-profile-name>
+aws cloudformation deploy --template-file ec2-ubuntu.cfn.yml --stack-name min-dev-ec2 --parameter-overrides Ec2SubnetId=<subnet-id> Ec2SecurityGroupId=<security-group-id> Ec2IamInstanceProfileName=<instance-profile-name>
 ```
 
 Choose one EC2 template per `${SystemName}-${EnvType}` deployment because both EC2 templates reuse the same shared imports and export names.

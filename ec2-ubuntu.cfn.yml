@@ -12,7 +12,7 @@ Parameters:
   SystemName:
     Description: System name used for resource naming and tagging
     Type: String
-    Default: fte
+    Default: min
   EnvType:
     Description: Environment type used for resource naming and tagging
     Type: String
@@ -169,9 +169,9 @@ Resources:
                     echo "Amazon SSM Agent service was not found on the instance." >&2
                     exit 1
                   fi
-                ) || user_data_exit_code=${?}
+                ) || user_data_exit_code=$?
 
-                cfn-signal --exit-code "${user_data_exit_code}" --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+                cfn-signal --exit-code "$user_data_exit_code" --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
       Tags:
         - Key: Name
           Value: !Sub "${SystemName}-${EnvType}-ec2-instance"

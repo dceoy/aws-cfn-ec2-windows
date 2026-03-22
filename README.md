@@ -33,7 +33,7 @@ The Windows template installs [winget](https://github.com/microsoft/winget-cli) 
 
 | Parameter            | Default       | Description                               |
 | -------------------- | ------------- | ----------------------------------------- |
-| `SystemName`         | `fte`         | System name used for naming and tags      |
+| `SystemName`         | `min`         | System name used for naming and tags      |
 | `EnvType`            | `dev`         | Environment type used for naming and tags |
 | `Ec2VpcCidrBlock`    | `10.0.0.0/16` | IPv4 CIDR block for the VPC               |
 | `Ec2SubnetCidrBlock` | `10.0.0.0/24` | IPv4 CIDR block for the public subnet     |
@@ -42,14 +42,14 @@ The Windows template installs [winget](https://github.com/microsoft/winget-cli) 
 
 | Parameter    | Default | Description                               |
 | ------------ | ------- | ----------------------------------------- |
-| `SystemName` | `fte`   | System name used for naming and tags      |
+| `SystemName` | `min`   | System name used for naming and tags      |
 | `EnvType`    | `dev`   | Environment type used for naming and tags |
 
 ## Parameters for `ec2-windows.cfn.yml`
 
 | Parameter                   | Default                    | Description                                                                                       |
 | --------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------- |
-| `SystemName`                | `fte`                      | System name used for naming and tags                                                              |
+| `SystemName`                | `min`                      | System name used for naming and tags                                                              |
 | `EnvType`                   | `dev`                      | Environment type used for naming and tags                                                         |
 | `Ec2SubnetId`               | `''`                       | Optional subnet ID override; empty imports `${SystemName}-${EnvType}-ec2-subnet`                  |
 | `Ec2SecurityGroupId`        | `''`                       | Optional security group ID override; empty imports `${SystemName}-${EnvType}-ec2-sg`              |
@@ -64,7 +64,7 @@ The Windows template installs [winget](https://github.com/microsoft/winget-cli) 
 
 | Parameter                   | Default                    | Description                                                                                       |
 | --------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------- |
-| `SystemName`                | `fte`                      | System name used for naming and tags                                                              |
+| `SystemName`                | `min`                      | System name used for naming and tags                                                              |
 | `EnvType`                   | `dev`                      | Environment type used for naming and tags                                                         |
 | `Ec2SubnetId`               | `''`                       | Optional subnet ID override; empty imports `${SystemName}-${EnvType}-ec2-subnet`                  |
 | `Ec2SecurityGroupId`        | `''`                       | Optional security group ID override; empty imports `${SystemName}-${EnvType}-ec2-sg`              |
@@ -77,16 +77,16 @@ The Windows template installs [winget](https://github.com/microsoft/winget-cli) 
 
 ## Usage
 
-Deploy the support stack first:
+Deploy the VPC stack first:
 
 ```bash
-aws cloudformation deploy --template-file vpc.cfn.yml --stack-name fte-dev-ec2-support
+aws cloudformation deploy --template-file vpc.cfn.yml --stack-name min-dev-ec2-vpc
 ```
 
 Then deploy the IAM stack:
 
 ```bash
-aws cloudformation deploy --template-file iam.cfn.yml --stack-name fte-dev-ec2-iam --capabilities CAPABILITY_NAMED_IAM
+aws cloudformation deploy --template-file iam.cfn.yml --stack-name min-dev-ec2-iam --capabilities CAPABILITY_NAMED_IAM
 ```
 
 Each stack exports its outputs under predictable names:
@@ -120,19 +120,19 @@ With the default parameters, either EC2 template automatically imports these exp
 Deploy the Windows stack:
 
 ```bash
-aws cloudformation deploy --template-file ec2-windows.cfn.yml --stack-name fte-dev-ec2
+aws cloudformation deploy --template-file ec2-windows.cfn.yml --stack-name min-dev-ec2
 ```
 
 Deploy the Ubuntu stack:
 
 ```bash
-aws cloudformation deploy --template-file ec2-ubuntu.cfn.yml --stack-name fte-dev-ec2
+aws cloudformation deploy --template-file ec2-ubuntu.cfn.yml --stack-name min-dev-ec2
 ```
 
 If you need to pin different existing resources, you can still supply explicit overrides:
 
 ```bash
-aws cloudformation deploy --template-file <ec2-template-file> --stack-name fte-dev-ec2 --parameter-overrides Ec2SubnetId=<subnet-id> Ec2SecurityGroupId=<security-group-id> Ec2IamInstanceProfileName=<instance-profile-name>
+aws cloudformation deploy --template-file <ec2-template-file> --stack-name min-dev-ec2 --parameter-overrides Ec2SubnetId=<subnet-id> Ec2SecurityGroupId=<security-group-id> Ec2IamInstanceProfileName=<instance-profile-name>
 ```
 
 Use matching `SystemName` and `EnvType` values across all three stacks whenever you rely

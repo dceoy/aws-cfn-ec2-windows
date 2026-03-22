@@ -187,14 +187,14 @@ Outputs:
     Description: EC2 instance ID
     Value: !Ref Ec2Instance
     Export:
-      Name: !Sub "${SystemName}-${EnvType}-ec2-instance"
+      Name: !Sub "${SystemName}-${EnvType}-ec2-ubuntu-instance"
   Ec2PrivateIp:
     Description: Private IP address of the instance
     Value: !GetAtt Ec2Instance.PrivateIp
     Export:
-      Name: !Sub "${SystemName}-${EnvType}-ec2-instance-private-ip"
+      Name: !Sub "${SystemName}-${EnvType}-ec2-ubuntu-instance-private-ip"
   Ec2PublicIp:
     Description: Public IP address of the instance
     Value: !GetAtt Ec2Instance.PublicIp
     Export:
-      Name: !Sub "${SystemName}-${EnvType}-ec2-instance-public-ip"
+      Name: !Sub "${SystemName}-${EnvType}-ec2-ubuntu-instance-public-ip"

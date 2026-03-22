@@ -14,8 +14,8 @@ This repository provides four CloudFormation templates:
 Both EC2 templates import the matching subnet, security group, and instance profile
 by default using the shared `${SystemName}-${EnvType}-*` naming convention.
 
-All stack outputs are exported with names derived from `${SystemName}-${EnvType}-*`
-so other stacks and tooling can reference them consistently.
+The VPC and IAM stacks export shared `${SystemName}-${EnvType}-*` names, while each
+EC2 template publishes OS-specific export names so Windows and Ubuntu outputs do not collide.
 
 The instance is accessible via [AWS Systems Manager Session Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html) — no RDP, SSH, or key pair required.
 The Windows template installs [winget](https://github.com/microsoft/winget-cli) and several desktop-oriented tools, while the Ubuntu template uses a shell bootstrap to install a small CLI toolset and ensure SSM Agent is running.
@@ -102,14 +102,18 @@ Each stack exports its outputs under predictable names:
 - `iam.cfn.yml`
   - `${SystemName}-${EnvType}-iam-instance-profile`
   - `${SystemName}-${EnvType}-iam-role`
-- `ec2-windows.cfn.yml` or `ec2-ubuntu.cfn.yml`
-  - `${SystemName}-${EnvType}-ec2-instance`
-  - `${SystemName}-${EnvType}-ec2-instance-private-ip`
-  - `${SystemName}-${EnvType}-ec2-instance-public-ip`
+- `ec2-windows.cfn.yml`
+  - `${SystemName}-${EnvType}-ec2-windows-instance`
+  - `${SystemName}-${EnvType}-ec2-windows-instance-private-ip`
+  - `${SystemName}-${EnvType}-ec2-windows-instance-public-ip`
+- `ec2-ubuntu.cfn.yml`
+  - `${SystemName}-${EnvType}-ec2-ubuntu-instance`
+  - `${SystemName}-${EnvType}-ec2-ubuntu-instance-private-ip`
+  - `${SystemName}-${EnvType}-ec2-ubuntu-instance-public-ip`
 
-Choose one EC2 template per `${SystemName}-${EnvType}` deployment. Both EC2 templates
-import the same shared exports and publish the same EC2 export names, so they are intended
-as alternatives rather than side-by-side stacks with identical parameters.
+Both EC2 templates still import the same shared VPC and IAM exports, but their EC2
+export names are now OS-specific. If you deploy both variants for the same
+`${SystemName}-${EnvType}`, use distinct CloudFormation stack names.
 
 With the default parameters, either EC2 template automatically imports these exported values:
 

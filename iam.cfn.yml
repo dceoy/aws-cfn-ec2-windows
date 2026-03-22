@@ -2,7 +2,7 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
   CloudFormation template to create the IAM role and instance profile
-  for the Windows Server EC2 instance managed by the companion stacks.
+  for the EC2 instance stacks managed by the companion templates.
 Parameters:
   SystemName:
     Description: System name used for resource naming and tagging

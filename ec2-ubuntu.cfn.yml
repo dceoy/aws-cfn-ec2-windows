@@ -1,0 +1,200 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  CloudFormation template to launch an Ubuntu Server EC2 instance
+  using existing networking resources and an existing IAM instance profile
+  imported from the companion stacks by default.
+  The instance is accessible via AWS Systems Manager Session Manager
+  and uses a shell UserData script for first-boot bootstrap.
+  Explicit resource overrides and a custom UserData script can optionally
+  be supplied at deploy time.
+Parameters:
+  SystemName:
+    Description: System name used for resource naming and tagging
+    Type: String
+    Default: fte
+  EnvType:
+    Description: Environment type used for resource naming and tagging
+    Type: String
+    Default: dev
+  Ec2SubnetId:
+    Description: >-
+      Optional subnet ID override.
+      Leave empty to import the matching subnet from the companion VPC stack.
+    Type: String
+    Default: ''
+    AllowedPattern: ^$|^subnet-[0-9A-Za-z]+$
+    ConstraintDescription: Must be empty or a valid subnet ID (e.g. subnet-1234abcd).
+  Ec2SecurityGroupId:
+    Description: >-
+      Optional security group ID override.
+      Leave empty to import the matching security group from the companion VPC stack.
+    Type: String
+    Default: ''
+    AllowedPattern: ^$|^sg-[0-9A-Za-z]+$
+    ConstraintDescription: Must be empty or a valid security group ID (e.g. sg-1234abcd).
+  Ec2IamInstanceProfileName:
+    Description: >-
+      Optional IAM instance profile name override.
+      Leave empty to import the matching instance profile from the companion IAM stack.
+    Type: String
+    Default: ''
+    AllowedPattern: ^$|^[A-Za-z0-9+=,.@_-]+$
+    ConstraintDescription: Must be empty or a valid IAM instance profile name.
+  Ec2InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: m7i-flex.large
+    # AllowedValues:  # The following instance types are free tier eligible.
+    #   - t4g.micro
+    #   - t4g.small
+    #   - t3.micro
+    #   - t3.small
+    #   - c7i-flex.large
+    #   - m7i-flex.large
+  Ec2UbuntuAmiId:
+    Description: >-
+      SSM parameter path for the Ubuntu Server AMI ID.
+      Defaults to the latest Ubuntu Server 24.04 LTS AMD64 AMI.
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+  Ec2VolumeSize:
+    Description: Root EBS volume size in GiB
+    Type: Number
+    Default: 64
+    MinValue: 16
+    MaxValue: 1024
+  Ec2VolumeType:
+    Description: Root EBS volume type (io1/io2 are omitted; they require Iops)
+    Type: String
+    Default: gp3
+    AllowedValues:
+      - gp3
+      - gp2
+  Ec2UserData:
+    Description: >-
+      Optional EC2 UserData script to use instead of the default bootstrap.
+      Leave empty to keep the built-in shell bootstrap behavior.
+    Type: String
+    Default: ''
+    NoEcho: true
+Conditions:
+  HasEc2SubnetIdOverride:
+    Fn::Not:
+      - Fn::Equals:
+          - !Ref Ec2SubnetId
+          - ''
+  HasEc2SecurityGroupIdOverride:
+    Fn::Not:
+      - Fn::Equals:
+          - !Ref Ec2SecurityGroupId
+          - ''
+  HasEc2IamInstanceProfileNameOverride:
+    Fn::Not:
+      - Fn::Equals:
+          - !Ref Ec2IamInstanceProfileName
+          - ''
+  HasEc2UserData:
+    Fn::Not:
+      - Fn::Equals:
+          - !Ref Ec2UserData
+          - ''
+Resources:
+  # trivy:ignore:AWS-0028
+  Ec2Instance:
+    Type: AWS::EC2::Instance
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_88
+            comment: >-
+              Public IP is required for internet access during the default UserData bootstrap.
+              Inbound access is blocked by the security group (no ingress rules).
+    Properties:
+      ImageId: !Ref Ec2UbuntuAmiId
+      InstanceType: !Ref Ec2InstanceType
+      IamInstanceProfile: !If
+        - HasEc2IamInstanceProfileNameOverride
+        - !Ref Ec2IamInstanceProfileName
+        - Fn::ImportValue:
+            Fn::Sub: "${SystemName}-${EnvType}-iam-instance-profile"
+      MetadataOptions:
+        HttpTokens: required
+        HttpEndpoint: enabled
+      NetworkInterfaces:
+        - DeviceIndex: 0
+          SubnetId: !If
+            - HasEc2SubnetIdOverride
+            - !Ref Ec2SubnetId
+            - Fn::ImportValue:
+                Fn::Sub: "${SystemName}-${EnvType}-ec2-subnet"
+          AssociatePublicIpAddress: true
+          GroupSet:
+            - !If
+              - HasEc2SecurityGroupIdOverride
+              - !Ref Ec2SecurityGroupId
+              - Fn::ImportValue:
+                  Fn::Sub: "${SystemName}-${EnvType}-ec2-sg"
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: !Ref Ec2VolumeSize
+            VolumeType: !Ref Ec2VolumeType
+            Encrypted: true
+            DeleteOnTermination: true
+      UserData:
+        Fn::Base64:
+          Fn::If:
+            - HasEc2UserData
+            - !Ref Ec2UserData
+            - !Sub |
+                #!/bin/bash
+                set -uox pipefail
+
+                export DEBIAN_FRONTEND=noninteractive
+                user_data_exit_code=0
+
+                (
+                  set -e
+                  apt-get update
+                  apt-get install -y awscli ca-certificates curl git python3-pip unzip vim
+                  python3 -m pip install --break-system-packages https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+
+                  if systemctl list-unit-files --type=service | grep -q '^amazon-ssm-agent\.service'; then
+                    systemctl enable amazon-ssm-agent
+                    systemctl start amazon-ssm-agent
+                  elif command -v snap >/dev/null 2>&1 && snap services amazon-ssm-agent >/dev/null 2>&1; then
+                    snap start amazon-ssm-agent
+                  else
+                    echo "Amazon SSM Agent service was not found on the instance." >&2
+                    exit 1
+                  fi
+                ) || user_data_exit_code=${?}
+
+                cfn-signal --exit-code "${user_data_exit_code}" --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+      Tags:
+        - Key: Name
+          Value: !Sub "${SystemName}-${EnvType}-ec2-instance"
+        - Key: SystemName
+          Value: !Ref SystemName
+        - Key: EnvType
+          Value: !Ref EnvType
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT30M
+Outputs:
+  Ec2InstanceId:
+    Description: EC2 instance ID
+    Value: !Ref Ec2Instance
+    Export:
+      Name: !Sub "${SystemName}-${EnvType}-ec2-instance"
+  Ec2PrivateIp:
+    Description: Private IP address of the instance
+    Value: !GetAtt Ec2Instance.PrivateIp
+    Export:
+      Name: !Sub "${SystemName}-${EnvType}-ec2-instance-private-ip"
+  Ec2PublicIp:
+    Description: Public IP address of the instance
+    Value: !GetAtt Ec2Instance.PublicIp
+    Export:
+      Name: !Sub "${SystemName}-${EnvType}-ec2-instance-public-ip"

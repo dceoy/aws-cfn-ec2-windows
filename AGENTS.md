@@ -2,7 +2,7 @@
 
 ## Overview
 
-The main deliverables are [`vpc.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/vpc.cfn.yml), [`iam.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/iam.cfn.yml), and [`ec2.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/ec2.cfn.yml). The VPC template provisions the VPC, subnet, routing, and security prerequisites, the IAM template creates the EC2 role and instance profile, and the EC2 template launches the Windows Server instance with Session Manager access using those existing resources.
+The main deliverables are [`vpc.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/vpc.cfn.yml), [`iam.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/iam.cfn.yml), [`ec2-windows.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/ec2-windows.cfn.yml), and [`ec2-ubuntu.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/ec2-ubuntu.cfn.yml). The VPC template provisions the VPC, subnet, routing, and security prerequisites, the IAM template creates the EC2 role and instance profile, and the EC2 templates launch either a Windows Server or Ubuntu instance with Session Manager access using those existing resources.
 
 ## Deployment Instructions
 
@@ -11,8 +11,11 @@ Use the AWS CLI to deploy or update the stacks:
 ```bash
 aws cloudformation deploy --template-file vpc.cfn.yml --stack-name fte-dev-ec2-support
 aws cloudformation deploy --template-file iam.cfn.yml --stack-name fte-dev-ec2-iam --capabilities CAPABILITY_NAMED_IAM
-aws cloudformation deploy --template-file ec2.cfn.yml --stack-name fte-dev-ec2 --parameter-overrides Ec2SubnetId=<subnet-id> Ec2SecurityGroupId=<security-group-id> Ec2IamInstanceProfileName=<instance-profile-name>
+aws cloudformation deploy --template-file ec2-windows.cfn.yml --stack-name fte-dev-ec2 --parameter-overrides Ec2SubnetId=<subnet-id> Ec2SecurityGroupId=<security-group-id> Ec2IamInstanceProfileName=<instance-profile-name>
+aws cloudformation deploy --template-file ec2-ubuntu.cfn.yml --stack-name fte-dev-ec2 --parameter-overrides Ec2SubnetId=<subnet-id> Ec2SecurityGroupId=<security-group-id> Ec2IamInstanceProfileName=<instance-profile-name>
 ```
+
+Choose one EC2 template per `${SystemName}-${EnvType}` deployment because both EC2 templates reuse the same shared imports and export names.
 
 ## Code Quality & Validation
 

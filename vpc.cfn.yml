@@ -2,7 +2,7 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
   CloudFormation template to create the networking resources
-  required by the Windows Server EC2 instance stack.
+  required by the companion EC2 instance stacks.
 Parameters:
   SystemName:
     Description: System name used for resource naming and tagging

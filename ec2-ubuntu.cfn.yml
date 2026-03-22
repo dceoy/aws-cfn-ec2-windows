@@ -156,8 +156,11 @@ Resources:
 
                 (
                   set -e
-                  apt-get update
-                  apt-get install -y awscli ca-certificates curl git python3-pip unzip vim
+                  apt-get -y update
+                  apt-get -y upgrade
+                  apt-get -y install awscli ca-certificates curl git python3-pip unzip vim
+                  apt-get -y autoremove
+                  apt-get -y clean
                   python3 -m pip install --break-system-packages https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
 
                   if systemctl list-unit-files --type=service | grep -q '^amazon-ssm-agent\.service'; then
@@ -174,7 +177,7 @@ Resources:
                 cfn-signal --exit-code "$user_data_exit_code" --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
       Tags:
         - Key: Name
-          Value: !Sub "${SystemName}-${EnvType}-ec2-instance"
+          Value: !Sub "${SystemName}-${EnvType}-ec2-ubuntu-instance"
         - Key: SystemName
           Value: !Ref SystemName
         - Key: EnvType

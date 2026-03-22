@@ -15,7 +15,8 @@ Both EC2 templates import the matching subnet, security group, and instance prof
 by default using the shared `${SystemName}-${EnvType}-*` naming convention.
 
 The VPC and IAM stacks export shared `${SystemName}-${EnvType}-*` names, while each
-EC2 template publishes OS-specific export names so Windows and Ubuntu outputs do not collide.
+EC2 template publishes OS-specific export names and an OS-specific EC2 `Name` tag
+so Windows and Ubuntu resources do not collide.
 
 The instance is accessible via [AWS Systems Manager Session Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html) — no RDP, SSH, or key pair required.
 The Windows template installs [winget](https://github.com/microsoft/winget-cli) and several desktop-oriented tools, while the Ubuntu template uses a shell bootstrap to install a small CLI toolset and ensure SSM Agent is running.
@@ -112,7 +113,7 @@ Each stack exports its outputs under predictable names:
   - `${SystemName}-${EnvType}-ec2-ubuntu-instance-public-ip`
 
 Both EC2 templates still import the same shared VPC and IAM exports, but their EC2
-export names are now OS-specific. If you deploy both variants for the same
+export names and instance `Name` tags are now OS-specific. If you deploy both variants for the same
 `${SystemName}-${EnvType}`, use distinct CloudFormation stack names.
 
 With the default parameters, either EC2 template automatically imports these exported values:

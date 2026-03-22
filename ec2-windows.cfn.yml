@@ -203,29 +203,29 @@ Resources:
                 Remove-Item -Path $dependenciesDir -Recurse -Force -ErrorAction SilentlyContinue
 
                 # --- Install packages with winget ---
-                $packages = @(
-                  "Microsoft.WindowsTerminal",
-                  "Microsoft.PowerShell",
-                  "vim.vim",
-                  "Microsoft.VisualStudioCode",
-                  "Microsoft.VisualStudioCode.CLI",
-                  "Microsoft.PowerToys",
-                  "Git.Git",
-                  "astral-sh.uv",
-                  "Google.Chrome",
-                  "Google.ChromeRemoteDesktop",
-                  "Tailscale.Tailscale",
-                  "Amazon.AWSCLI",
-                  "Dropbox.Dropbox"
-                )
-                $userDataExitCode = 0
-                foreach ($pkg in $packages) {
-                  winget install --id $pkg --exact --silent --accept-package-agreements --accept-source-agreements
-                  if ($LASTEXITCODE -ne 0) {
-                    $userDataExitCode = $LASTEXITCODE
-                    break
-                  }
-                }
+                # $packages = @(
+                #   "Microsoft.WindowsTerminal",
+                #   "Microsoft.PowerShell",
+                #   "vim.vim",
+                #   "Microsoft.VisualStudioCode",
+                #   "Microsoft.VisualStudioCode.CLI",
+                #   "Microsoft.PowerToys",
+                #   "Git.Git",
+                #   "astral-sh.uv",
+                #   "Google.Chrome",
+                #   "Google.ChromeRemoteDesktop",
+                #   "Tailscale.Tailscale",
+                #   "Amazon.AWSCLI",
+                #   "Dropbox.Dropbox"
+                # )
+                # $userDataExitCode = 0
+                # foreach ($pkg in $packages) {
+                #   winget install --id $pkg --exact --silent --accept-package-agreements --accept-source-agreements
+                #   if ($LASTEXITCODE -ne 0) {
+                #     $userDataExitCode = $LASTEXITCODE
+                #     break
+                #   }
+                # }
 
                 # Signal CloudFormation
                 cfn-signal.exe --exit-code $userDataExitCode `
@@ -234,7 +234,7 @@ Resources:
                 </powershell>
       Tags:
         - Key: Name
-          Value: !Sub "${SystemName}-${EnvType}-ec2-instance"
+          Value: !Sub "${SystemName}-${EnvType}-ec2-windows-instance"
         - Key: SystemName
           Value: !Ref SystemName
         - Key: EnvType

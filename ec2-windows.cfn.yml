@@ -12,7 +12,7 @@ Parameters:
   SystemName:
     Description: System name used for resource naming and tagging
     Type: String
-    Default: fte
+    Default: min
   EnvType:
     Description: Environment type used for resource naming and tagging
     Type: String

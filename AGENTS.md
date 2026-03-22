@@ -2,14 +2,15 @@
 
 ## Overview
 
-The main deliverable is [`ec2.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/ec2.cfn.yml), a CloudFormation template that provisions a Windows Server EC2 stack plus supporting VPC, subnet, routing, IAM, and Session Manager access.
+The main deliverables are [`vpc.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/vpc.cfn.yml) and [`ec2.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/ec2.cfn.yml). The VPC template provisions the VPC, subnet, routing, and security prerequisites, and the EC2 template launches the Windows Server instance plus its IAM resources with Session Manager access.
 
 ## Deployment Instructions
 
-Use the AWS CLI to deploy or update the stack:
+Use the AWS CLI to deploy or update the stacks:
 
 ```bash
-aws cloudformation deploy --template-file ec2.cfn.yml --stack-name fte-dev-ec2 --capabilities CAPABILITY_NAMED_IAM
+aws cloudformation deploy --template-file vpc.cfn.yml --stack-name fte-dev-ec2-support
+aws cloudformation deploy --template-file ec2.cfn.yml --stack-name fte-dev-ec2 --capabilities CAPABILITY_NAMED_IAM --parameter-overrides Ec2SubnetId=<subnet-id> Ec2SecurityGroupId=<security-group-id>
 ```
 
 ## Code Quality & Validation

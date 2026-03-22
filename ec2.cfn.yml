@@ -1,7 +1,8 @@
 ---
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
-  CloudFormation template to launch a Windows Server EC2 instance.
+  CloudFormation template to launch a Windows Server EC2 instance
+  using existing networking resources and stack-managed IAM resources.
   The instance is accessible via AWS Systems Manager Session Manager
   and uses a PowerShell UserData script for first-boot bootstrap.
   A custom UserData script can optionally be supplied at deploy time.
@@ -14,18 +15,12 @@ Parameters:
     Description: Environment type used for resource naming and tagging
     Type: String
     Default: dev
-  Ec2VpcCidrBlock:
-    Description: IPv4 CIDR block for the VPC
-    Type: String
-    Default: 10.0.0.0/16
-    AllowedPattern: ^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$
-    ConstraintDescription: Must be a valid CIDR block (e.g. 10.0.0.0/16).
-  Ec2SubnetCidrBlock:
-    Description: IPv4 CIDR block for the public subnet
-    Type: String
-    Default: 10.0.0.0/24
-    AllowedPattern: ^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$
-    ConstraintDescription: Must be a valid CIDR block (e.g. 10.0.0.0/24).
+  Ec2SubnetId:
+    Description: Existing subnet ID for the EC2 instance
+    Type: AWS::EC2::Subnet::Id
+  Ec2SecurityGroupId:
+    Description: Existing security group ID for the EC2 instance
+    Type: AWS::EC2::SecurityGroup::Id
   Ec2InstanceType:
     Description: EC2 instance type
     Type: String
@@ -70,214 +65,6 @@ Conditions:
           - !Ref Ec2UserData
           - ''
 Resources:
-  # trivy:ignore:AWS-0178
-  Ec2Vpc:
-    Type: AWS::EC2::VPC
-    Properties:
-      CidrBlock: !Ref Ec2VpcCidrBlock
-      EnableDnsSupport: true
-      EnableDnsHostnames: true
-      Tags:
-        - Key: Name
-          Value: !Sub "${SystemName}-${EnvType}-ec2-vpc"
-        - Key: SystemName
-          Value: !Ref SystemName
-        - Key: EnvType
-          Value: !Ref EnvType
-  Ec2Ipv6CidrBlock:
-    Type: AWS::EC2::VPCCidrBlock
-    Properties:
-      VpcId: !Ref Ec2Vpc
-      AmazonProvidedIpv6CidrBlock: true
-  Ec2Subnet:
-    Type: AWS::EC2::Subnet
-    DependsOn: Ec2Ipv6CidrBlock
-    Properties:
-      VpcId: !Ref Ec2Vpc
-      CidrBlock: !Ref Ec2SubnetCidrBlock
-      Ipv6CidrBlock: !Select
-        - 0
-        - !GetAtt Ec2Vpc.Ipv6CidrBlocks
-      MapPublicIpOnLaunch: true  # trivy:ignore:AWS-0164
-      Tags:
-        - Key: Name
-          Value: !Sub "${SystemName}-${EnvType}-ec2-subnet"
-        - Key: SystemName
-          Value: !Ref SystemName
-        - Key: EnvType
-          Value: !Ref EnvType
-  Ec2InternetGateway:
-    Type: AWS::EC2::InternetGateway
-    Properties:
-      Tags:
-        - Key: Name
-          Value: !Sub "${SystemName}-${EnvType}-ec2-igw"
-        - Key: SystemName
-          Value: !Ref SystemName
-        - Key: EnvType
-          Value: !Ref EnvType
-  Ec2VpcGatewayAttachment:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      VpcId: !Ref Ec2Vpc
-      InternetGatewayId: !Ref Ec2InternetGateway
-  Ec2EgressOnlyInternetGateway:
-    Type: AWS::EC2::EgressOnlyInternetGateway
-    Properties:
-      VpcId: !Ref Ec2Vpc
-  Ec2RouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref Ec2Vpc
-      Tags:
-        - Key: Name
-          Value: !Sub "${SystemName}-${EnvType}-ec2-rtb"
-        - Key: SystemName
-          Value: !Ref SystemName
-        - Key: EnvType
-          Value: !Ref EnvType
-  Ec2RouteIpv4Default:
-    Type: AWS::EC2::Route
-    DependsOn: Ec2VpcGatewayAttachment
-    Properties:
-      RouteTableId: !Ref Ec2RouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref Ec2InternetGateway
-  Ec2RouteIpv6Default:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref Ec2RouteTable
-      DestinationIpv6CidrBlock: ::/0
-      EgressOnlyInternetGatewayId: !Ref Ec2EgressOnlyInternetGateway
-  Ec2SubnetRouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref Ec2Subnet
-      RouteTableId: !Ref Ec2RouteTable
-  Ec2NetworkAcl:
-    Type: AWS::EC2::NetworkAcl
-    Properties:
-      VpcId: !Ref Ec2Vpc
-      Tags:
-        - Key: Name
-          Value: !Sub "${SystemName}-${EnvType}-ec2-nacl"
-        - Key: SystemName
-          Value: !Ref SystemName
-        - Key: EnvType
-          Value: !Ref EnvType
-  Ec2NetworkAclEntryInboundDenySsh:
-    Type: AWS::EC2::NetworkAclEntry
-    Properties:
-      NetworkAclId: !Ref Ec2NetworkAcl
-      RuleNumber: 100
-      Protocol: 6
-      RuleAction: deny
-      Egress: false
-      CidrBlock: 0.0.0.0/0
-      PortRange:
-        From: 22
-        To: 22
-  Ec2NetworkAclEntryInboundDenySshIpv6:
-    Type: AWS::EC2::NetworkAclEntry
-    Properties:
-      NetworkAclId: !Ref Ec2NetworkAcl
-      RuleNumber: 110
-      Protocol: 6
-      RuleAction: deny
-      Egress: false
-      Ipv6CidrBlock: ::/0
-      PortRange:
-        From: 22
-        To: 22
-  Ec2NetworkAclEntryInboundDenyRdp:
-    Type: AWS::EC2::NetworkAclEntry
-    Properties:
-      NetworkAclId: !Ref Ec2NetworkAcl
-      RuleNumber: 120
-      Protocol: 6
-      RuleAction: deny
-      Egress: false
-      CidrBlock: 0.0.0.0/0
-      PortRange:
-        From: 3389
-        To: 3389
-  Ec2NetworkAclEntryInboundDenyRdpIpv6:
-    Type: AWS::EC2::NetworkAclEntry
-    Properties:
-      NetworkAclId: !Ref Ec2NetworkAcl
-      RuleNumber: 130
-      Protocol: 6
-      RuleAction: deny
-      Egress: false
-      Ipv6CidrBlock: ::/0
-      PortRange:
-        From: 3389
-        To: 3389
-  Ec2NetworkAclEntryInboundAllowAll:
-    Type: AWS::EC2::NetworkAclEntry
-    Properties:
-      NetworkAclId: !Ref Ec2NetworkAcl
-      RuleNumber: 900
-      Protocol: -1  # trivy:ignore:AWS-0102
-      RuleAction: allow
-      Egress: false
-      CidrBlock: 0.0.0.0/0  # trivy:ignore:AWS-0105
-  Ec2NetworkAclEntryInboundAllowAllIpv6:
-    Type: AWS::EC2::NetworkAclEntry
-    Properties:
-      NetworkAclId: !Ref Ec2NetworkAcl
-      RuleNumber: 901
-      Protocol: -1  # trivy:ignore:AWS-0102
-      RuleAction: allow
-      Egress: false
-      Ipv6CidrBlock: ::/0  # trivy:ignore:AWS-0105
-  Ec2NetworkAclEntryOutboundAllowAll:
-    Type: AWS::EC2::NetworkAclEntry
-    Properties:
-      NetworkAclId: !Ref Ec2NetworkAcl
-      RuleNumber: 900
-      Protocol: -1  # trivy:ignore:AWS-0102
-      RuleAction: allow
-      Egress: true
-      CidrBlock: 0.0.0.0/0
-  Ec2NetworkAclEntryOutboundAllowAllIpv6:
-    Type: AWS::EC2::NetworkAclEntry
-    Properties:
-      NetworkAclId: !Ref Ec2NetworkAcl
-      RuleNumber: 901
-      Protocol: -1  # trivy:ignore:AWS-0102
-      RuleAction: allow
-      Egress: true
-      Ipv6CidrBlock: ::/0
-  Ec2SubnetNetworkAclAssociation:
-    Type: AWS::EC2::SubnetNetworkAclAssociation
-    Properties:
-      SubnetId: !Ref Ec2Subnet
-      NetworkAclId: !Ref Ec2NetworkAcl
-  Ec2SecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Sub "${SystemName}-${EnvType}-ec2-sg"
-      GroupDescription: !Sub "${SystemName}-${EnvType} - EC2 instance security group"
-      VpcId: !Ref Ec2Vpc
-      SecurityGroupEgress:
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0  # trivy:ignore:AWS-0104
-          Description: Allow outbound HTTPS (IPv4)
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIpv6: ::/0  # trivy:ignore:AWS-0104
-          Description: Allow outbound HTTPS (IPv6)
-      Tags:
-        - Key: Name
-          Value: !Sub "${SystemName}-${EnvType}-ec2-sg"
-        - Key: SystemName
-          Value: !Ref SystemName
-        - Key: EnvType
-          Value: !Ref EnvType
   IamRole:
     Type: AWS::IAM::Role
     Properties:
@@ -307,7 +94,6 @@ Resources:
   # trivy:ignore:AWS-0028
   Ec2Instance:
     Type: AWS::EC2::Instance
-    DependsOn: Ec2RouteIpv4Default
     Metadata:
       checkov:
         skip:
@@ -324,10 +110,10 @@ Resources:
         HttpEndpoint: enabled
       NetworkInterfaces:
         - DeviceIndex: 0
-          SubnetId: !Ref Ec2Subnet
+          SubnetId: !Ref Ec2SubnetId
           AssociatePublicIpAddress: true
           GroupSet:
-            - !Ref Ec2SecurityGroup
+            - !Ref Ec2SecurityGroupId
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
@@ -436,12 +222,12 @@ Resources:
       ResourceSignal:
         Timeout: PT30M
 Outputs:
-  Ec2VpcId:
-    Description: VPC ID
-    Value: !Ref Ec2Vpc
-  Ec2SubnetId:
-    Description: Subnet ID
-    Value: !Ref Ec2Subnet
+  Ec2IamInstanceProfileName:
+    Description: IAM instance profile name
+    Value: !Ref IamInstanceProfile
+  Ec2IamRoleName:
+    Description: IAM role name
+    Value: !Ref IamRole
   Ec2InstanceId:
     Description: EC2 instance ID
     Value: !Ref Ec2Instance
@@ -451,12 +237,3 @@ Outputs:
   Ec2PublicIp:
     Description: Public IP address of the instance
     Value: !GetAtt Ec2Instance.PublicIp
-  Ec2SecurityGroupId:
-    Description: Security group ID
-    Value: !Ref Ec2SecurityGroup
-  Ec2InternetGatewayId:
-    Description: Internet gateway ID
-    Value: !Ref Ec2InternetGateway
-  Ec2EgressOnlyInternetGatewayId:
-    Description: Egress-only internet gateway ID
-    Value: !Ref Ec2EgressOnlyInternetGateway

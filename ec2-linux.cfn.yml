@@ -1,13 +1,9 @@
 ---
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
-  CloudFormation template to launch an Ubuntu Server EC2 instance
+  CloudFormation template to launch an Amazon ECS-optimized Linux EC2 instance
   using existing networking resources and an existing IAM instance profile
   imported from the companion stacks by default.
-  The instance is accessible via AWS Systems Manager Session Manager
-  and uses a shell UserData script for first-boot bootstrap.
-  Explicit resource overrides and a custom UserData script can optionally
-  be supplied at deploy time.
 Parameters:
   SystemName:
     Description: System name used for resource naming and tagging
@@ -52,12 +48,12 @@ Parameters:
     #   - t3.small
     #   - c7i-flex.large
     #   - m7i-flex.large
-  Ec2UbuntuAmiId:
+  Ec2LinuxAmiId:
     Description: >-
-      SSM parameter path for the Ubuntu Server AMI ID.
-      Defaults to the latest Ubuntu Server 24.04 LTS AMD64 AMI.
+      SSM parameter path for the Amazon ECS-optimized Amazon Linux 2023 AMI ID.
+      Defaults to the latest recommended ECS-optimized Amazon Linux 2023 x86_64 AMI.
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
-    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+    Default: /aws/service/ecs/optimized-ami/amazon-linux-2023/recommended/image_id
   Ec2VolumeSize:
     Description: Root EBS volume size in GiB
     Type: Number
@@ -73,12 +69,16 @@ Parameters:
       - gp2
   Ec2UserData:
     Description: >-
-      Optional EC2 UserData script to use instead of the default bootstrap.
-      Leave empty to keep the built-in shell bootstrap behavior.
+      Optional EC2 UserData shell script.
+      Leave empty to omit UserData.
     Type: String
     Default: ''
-    NoEcho: true
 Conditions:
+  HasEc2UserDataOverride:
+    Fn::Not:
+      - Fn::Equals:
+          - !Ref Ec2UserData
+          - ''
   HasEc2SubnetIdOverride:
     Fn::Not:
       - Fn::Equals:
@@ -94,11 +94,6 @@ Conditions:
       - Fn::Equals:
           - !Ref Ec2IamInstanceProfileName
           - ''
-  HasEc2UserData:
-    Fn::Not:
-      - Fn::Equals:
-          - !Ref Ec2UserData
-          - ''
 Resources:
   # trivy:ignore:AWS-0028
   Ec2Instance:
@@ -108,10 +103,10 @@ Resources:
         skip:
           - id: CKV_AWS_88
             comment: >-
-              Public IP is required for internet access during the default UserData bootstrap.
+              Public IP keeps this minimal template usable without NAT or VPC endpoints.
               Inbound access is blocked by the security group (no ingress rules).
     Properties:
-      ImageId: !Ref Ec2UbuntuAmiId
+      ImageId: !Ref Ec2LinuxAmiId
       InstanceType: !Ref Ec2InstanceType
       IamInstanceProfile: !If
         - HasEc2IamInstanceProfileNameOverride
@@ -142,62 +137,30 @@ Resources:
             VolumeType: !Ref Ec2VolumeType
             Encrypted: true
             DeleteOnTermination: true
-      UserData:
-        Fn::Base64:
-          Fn::If:
-            - HasEc2UserData
-            - !Ref Ec2UserData
-            - !Sub |
-                #!/bin/bash
-                set -uox pipefail
-
-                export DEBIAN_FRONTEND=noninteractive
-                user_data_exit_code=0
-
-                (
-                  set -e
-                  apt-get -y update
-                  apt-get -y upgrade
-                  apt-get -y install awscli ca-certificates curl git python3-pip unzip vim
-                  apt-get -y autoremove
-                  apt-get -y clean
-                  python3 -m pip install --break-system-packages https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
-
-                  if systemctl list-unit-files --type=service | grep -q '^amazon-ssm-agent\.service'; then
-                    systemctl enable amazon-ssm-agent
-                    systemctl start amazon-ssm-agent
-                  elif command -v snap >/dev/null 2>&1 && snap services amazon-ssm-agent >/dev/null 2>&1; then
-                    snap start amazon-ssm-agent
-                  else
-                    echo "Amazon SSM Agent service was not found on the instance." >&2
-                    exit 1
-                  fi
-                ) || user_data_exit_code=$?
-
-                cfn-signal --exit-code "$user_data_exit_code" --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+      UserData: !If
+        - HasEc2UserDataOverride
+        - Fn::Base64: !Ref Ec2UserData
+        - !Ref AWS::NoValue
       Tags:
         - Key: Name
-          Value: !Sub "${SystemName}-${EnvType}-ec2-ubuntu-instance"
+          Value: !Sub "${SystemName}-${EnvType}-ec2-linux-instance"
         - Key: SystemName
           Value: !Ref SystemName
         - Key: EnvType
           Value: !Ref EnvType
-    CreationPolicy:
-      ResourceSignal:
-        Timeout: PT30M
 Outputs:
   Ec2InstanceId:
     Description: EC2 instance ID
     Value: !Ref Ec2Instance
     Export:
-      Name: !Sub "${SystemName}-${EnvType}-ec2-ubuntu-instance"
+      Name: !Sub "${SystemName}-${EnvType}-ec2-linux-instance"
   Ec2PrivateIp:
     Description: Private IP address of the instance
     Value: !GetAtt Ec2Instance.PrivateIp
     Export:
-      Name: !Sub "${SystemName}-${EnvType}-ec2-ubuntu-instance-private-ip"
+      Name: !Sub "${SystemName}-${EnvType}-ec2-linux-instance-private-ip"
   Ec2PublicIp:
     Description: Public IP address of the instance
     Value: !GetAtt Ec2Instance.PublicIp
     Export:
-      Name: !Sub "${SystemName}-${EnvType}-ec2-ubuntu-instance-public-ip"
+      Name: !Sub "${SystemName}-${EnvType}-ec2-linux-instance-public-ip"

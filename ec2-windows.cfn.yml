@@ -4,10 +4,6 @@ Description: >-
   CloudFormation template to launch a Windows Server EC2 instance
   using existing networking resources and an existing IAM instance profile
   imported from the companion stacks by default.
-  The instance is accessible via AWS Systems Manager Session Manager
-  and uses a PowerShell UserData script for first-boot bootstrap.
-  Explicit resource overrides and a custom UserData script can optionally
-  be supplied at deploy time.
 Parameters:
   SystemName:
     Description: System name used for resource naming and tagging
@@ -73,12 +69,16 @@ Parameters:
       - gp2
   Ec2UserData:
     Description: >-
-      Optional EC2 UserData script to use instead of the default bootstrap.
-      Leave empty to keep the built-in PowerShell bootstrap behavior.
+      Optional EC2 UserData script.
+      Leave empty to omit UserData.
     Type: String
     Default: ''
-    NoEcho: true
 Conditions:
+  HasEc2UserDataOverride:
+    Fn::Not:
+      - Fn::Equals:
+          - !Ref Ec2UserData
+          - ''
   HasEc2SubnetIdOverride:
     Fn::Not:
       - Fn::Equals:
@@ -94,11 +94,6 @@ Conditions:
       - Fn::Equals:
           - !Ref Ec2IamInstanceProfileName
           - ''
-  HasEc2UserData:
-    Fn::Not:
-      - Fn::Equals:
-          - !Ref Ec2UserData
-          - ''
 Resources:
   # trivy:ignore:AWS-0028
   Ec2Instance:
@@ -108,7 +103,7 @@ Resources:
         skip:
           - id: CKV_AWS_88
             comment: >-
-              Public IP is required for internet access during the default UserData bootstrap.
+              Public IP keeps this minimal template usable without NAT or VPC endpoints.
               Inbound access is blocked by the security group (no ingress rules).
     Properties:
       ImageId: !Ref Ec2WindowsAmiId
@@ -142,96 +137,10 @@ Resources:
             VolumeType: !Ref Ec2VolumeType
             Encrypted: true
             DeleteOnTermination: true
-      UserData:
-        Fn::Base64:
-          Fn::If:
-            - HasEc2UserData
-            - !Ref Ec2UserData
-            - !Sub |
-                <powershell>
-                $ErrorActionPreference = "Continue"
-
-                # --- Disable OpenSSH Server ---
-                $sshdSvc = Get-Service -Name sshd -ErrorAction SilentlyContinue
-                if ($sshdSvc) {
-                  Stop-Service sshd -Force -ErrorAction SilentlyContinue
-                  Set-Service sshd -StartupType Disabled
-                }
-
-                # --- Install winget (Windows Package Manager) ---
-                $wingetBundle = "$env:TEMP\Microsoft.DesktopAppInstaller.msixbundle"
-                $wingetLicense = "$env:TEMP\License1.xml"
-                $dependenciesDir = "$env:TEMP\winget-deps"
-                New-Item -ItemType Directory -Path $dependenciesDir -Force | Out-Null
-
-                # Fetch the latest winget release from GitHub
-                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-                $wingetApiUrl = "https://api.github.com/repos/microsoft/winget-cli/releases/latest"
-                $releaseInfo = Invoke-RestMethod -Uri $wingetApiUrl -UseBasicParsing
-                $msixUrl = ($releaseInfo.assets | Where-Object { $_.name -match '\.msixbundle$' }).browser_download_url
-                $licenseUrl = ($releaseInfo.assets | Where-Object { $_.name -match 'License.*\.xml$' }).browser_download_url
-
-                Invoke-WebRequest -Uri $msixUrl -OutFile $wingetBundle -UseBasicParsing
-                Invoke-WebRequest -Uri $licenseUrl -OutFile $wingetLicense -UseBasicParsing
-
-                # Download dependencies (VCLibs and Microsoft.UI.Xaml)
-                Invoke-WebRequest -Uri "https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx" `
-                  -OutFile "$dependenciesDir\VCLibs.appx" -UseBasicParsing
-                $uiXamlApiUrl = "https://api.github.com/repos/microsoft/microsoft-ui-xaml/releases?per_page=50"
-                $uiXamlRelease = Invoke-RestMethod -Uri $uiXamlApiUrl -UseBasicParsing
-                $uiXaml2x = $uiXamlRelease | Where-Object { $_.tag_name -match '^v2\.' } | Select-Object -First 1
-                $uiXamlUrl = ($uiXaml2x.assets | Where-Object { $_.name -match 'x64.*\.appx$' }).browser_download_url
-                Invoke-WebRequest -Uri $uiXamlUrl -OutFile "$dependenciesDir\UIXaml.appx" -UseBasicParsing
-
-                # Install winget with dependencies
-                Add-AppxProvisionedPackage -Online `
-                  -PackagePath $wingetBundle `
-                  -LicensePath $wingetLicense `
-                  -DependencyPackagePath "$dependenciesDir\VCLibs.appx","$dependenciesDir\UIXaml.appx"
-
-                # Add winget to the PATH for the current session
-                $wingetFilter = "Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe"
-                $wingetAppsDir = "$env:ProgramFiles\WindowsApps"
-                $wingetDir = (Get-ChildItem -Path $wingetAppsDir -Filter $wingetFilter -Directory |
-                  Sort-Object Name -Descending | Select-Object -First 1).FullName
-                if ($wingetDir) {
-                  $env:Path += ";$wingetDir"
-                }
-
-                # Clean up winget installer files
-                Remove-Item -Path $wingetBundle, $wingetLicense -Force -ErrorAction SilentlyContinue
-                Remove-Item -Path $dependenciesDir -Recurse -Force -ErrorAction SilentlyContinue
-
-                # --- Install packages with winget ---
-                # $packages = @(
-                #   "Microsoft.WindowsTerminal",
-                #   "Microsoft.PowerShell",
-                #   "vim.vim",
-                #   "Microsoft.VisualStudioCode",
-                #   "Microsoft.VisualStudioCode.CLI",
-                #   "Microsoft.PowerToys",
-                #   "Git.Git",
-                #   "astral-sh.uv",
-                #   "Google.Chrome",
-                #   "Google.ChromeRemoteDesktop",
-                #   "Tailscale.Tailscale",
-                #   "Amazon.AWSCLI",
-                #   "Dropbox.Dropbox"
-                # )
-                # $userDataExitCode = 0
-                # foreach ($pkg in $packages) {
-                #   winget install --id $pkg --exact --silent --accept-package-agreements --accept-source-agreements
-                #   if ($LASTEXITCODE -ne 0) {
-                #     $userDataExitCode = $LASTEXITCODE
-                #     break
-                #   }
-                # }
-
-                # Signal CloudFormation
-                cfn-signal.exe --exit-code $userDataExitCode `
-                  --stack ${AWS::StackName} --resource Ec2Instance `
-                  --region ${AWS::Region}
-                </powershell>
+      UserData: !If
+        - HasEc2UserDataOverride
+        - Fn::Base64: !Ref Ec2UserData
+        - !Ref AWS::NoValue
       Tags:
         - Key: Name
           Value: !Sub "${SystemName}-${EnvType}-ec2-windows-instance"
@@ -239,9 +148,6 @@ Resources:
           Value: !Ref SystemName
         - Key: EnvType
           Value: !Ref EnvType
-    CreationPolicy:
-      ResourceSignal:
-        Timeout: PT30M
 Outputs:
   Ec2InstanceId:
     Description: EC2 instance ID

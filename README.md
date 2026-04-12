@@ -1,6 +1,6 @@
 # aws-cfn-ec2-minimal
 
-AWS CloudFormation templates for Windows Server and Ubuntu on Amazon EC2
+AWS CloudFormation templates for Windows Server and Linux on Amazon EC2
 
 ## Overview
 
@@ -9,26 +9,27 @@ This repository provides four CloudFormation templates:
 - `vpc.cfn.yml` creates the shared networking and security resources.
 - `iam.cfn.yml` creates the IAM role and instance profile used by the EC2 instance.
 - `ec2-windows.cfn.yml` launches the Windows Server 2025 EC2 instance into that existing infrastructure.
-- `ec2-ubuntu.cfn.yml` launches the Ubuntu Server 24.04 LTS EC2 instance into that existing infrastructure.
+- `ec2-linux.cfn.yml` launches the Amazon ECS-optimized Amazon Linux 2023 x86_64 EC2 instance into that existing infrastructure.
 
 Both EC2 templates import the matching subnet, security group, and instance profile
 by default using the shared `${SystemName}-${EnvType}-*` naming convention.
 
 The VPC and IAM stacks export shared `${SystemName}-${EnvType}-*` names, while each
 EC2 template publishes OS-specific export names and an OS-specific EC2 `Name` tag
-so Windows and Ubuntu resources do not collide.
+so Windows and Linux resources do not collide.
 
-The instance is accessible via [AWS Systems Manager Session Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html) — no RDP, SSH, or key pair required.
-The Windows template installs [winget](https://github.com/microsoft/winget-cli) and several desktop-oriented tools, while the Ubuntu template uses a shell bootstrap to install a small CLI toolset and ensure SSM Agent is running.
+The EC2 instances are accessible via [AWS Systems Manager Session Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html) with the companion IAM role, so no RDP, SSH, or key pair is required.
+Both EC2 templates require IMDSv2, attach encrypted root volumes, associate public IP addresses, and omit `UserData` by default unless you provide `Ec2UserData`.
+The VPC template creates a dual-stack public subnet, internet connectivity for IPv4 and IPv6, S3 and DynamoDB gateway endpoints, a network ACL that explicitly denies inbound SSH and RDP, and a security group with no ingress rules and outbound HTTPS only.
 
 ## Template
 
-| File                  | Description                                                     |
-| --------------------- | --------------------------------------------------------------- |
-| `vpc.cfn.yml`         | VPC, subnet, routing, network ACL, and security group resources |
-| `iam.cfn.yml`         | IAM role and instance profile for Systems Manager access        |
-| `ec2-windows.cfn.yml` | Windows Server 2025 EC2 instance                                |
-| `ec2-ubuntu.cfn.yml`  | Ubuntu Server 24.04 LTS EC2 instance                            |
+| File                  | Description                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| `vpc.cfn.yml`         | Dual-stack VPC, public subnet, routing, gateway endpoints, network ACL, and security group |
+| `iam.cfn.yml`         | IAM role and instance profile for Systems Manager access                                   |
+| `ec2-windows.cfn.yml` | Windows Server 2025 EC2 instance                                                           |
+| `ec2-linux.cfn.yml`   | Amazon ECS-optimized Amazon Linux 2023 x86_64 EC2 instance                                 |
 
 ## Parameters for `vpc.cfn.yml`
 
@@ -59,22 +60,22 @@ The Windows template installs [winget](https://github.com/microsoft/winget-cli) 
 | `Ec2WindowsAmiId`           | Latest Windows Server 2025 | SSM parameter for the AMI ID                                                                      |
 | `Ec2VolumeSize`             | `64`                       | Root EBS volume size in GiB                                                                       |
 | `Ec2VolumeType`             | `gp3`                      | Root EBS volume type                                                                              |
-| `Ec2UserData`               | `''`                       | Optional full UserData script that replaces the default bootstrap                                 |
+| `Ec2UserData`               | `''`                       | Optional EC2 UserData script; empty omits `UserData`                                              |
 
-## Parameters for `ec2-ubuntu.cfn.yml`
+## Parameters for `ec2-linux.cfn.yml`
 
-| Parameter                   | Default                    | Description                                                                                       |
-| --------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------- |
-| `SystemName`                | `min`                      | System name used for naming and tags                                                              |
-| `EnvType`                   | `dev`                      | Environment type used for naming and tags                                                         |
-| `Ec2SubnetId`               | `''`                       | Optional subnet ID override; empty imports `${SystemName}-${EnvType}-ec2-subnet`                  |
-| `Ec2SecurityGroupId`        | `''`                       | Optional security group ID override; empty imports `${SystemName}-${EnvType}-ec2-sg`              |
-| `Ec2IamInstanceProfileName` | `''`                       | Optional instance profile override; empty imports `${SystemName}-${EnvType}-iam-instance-profile` |
-| `Ec2InstanceType`           | `m7i-flex.large`           | EC2 instance type                                                                                 |
-| `Ec2UbuntuAmiId`            | Latest Ubuntu Server 24.04 | SSM parameter for the AMI ID                                                                      |
-| `Ec2VolumeSize`             | `64`                       | Root EBS volume size in GiB                                                                       |
-| `Ec2VolumeType`             | `gp3`                      | Root EBS volume type                                                                              |
-| `Ec2UserData`               | `''`                       | Optional full UserData script that replaces the default bootstrap                                 |
+| Parameter                   | Default                            | Description                                                                                       |
+| --------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `SystemName`                | `min`                              | System name used for naming and tags                                                              |
+| `EnvType`                   | `dev`                              | Environment type used for naming and tags                                                         |
+| `Ec2SubnetId`               | `''`                               | Optional subnet ID override; empty imports `${SystemName}-${EnvType}-ec2-subnet`                  |
+| `Ec2SecurityGroupId`        | `''`                               | Optional security group ID override; empty imports `${SystemName}-${EnvType}-ec2-sg`              |
+| `Ec2IamInstanceProfileName` | `''`                               | Optional instance profile override; empty imports `${SystemName}-${EnvType}-iam-instance-profile` |
+| `Ec2InstanceType`           | `m7i-flex.large`                   | EC2 instance type                                                                                 |
+| `Ec2LinuxAmiId`             | Latest ECS-optimized AL2023 x86_64 | SSM parameter for the AMI ID                                                                      |
+| `Ec2VolumeSize`             | `64`                               | Root EBS volume size in GiB                                                                       |
+| `Ec2VolumeType`             | `gp3`                              | Root EBS volume type                                                                              |
+| `Ec2UserData`               | `''`                               | Optional EC2 UserData shell script; empty omits `UserData`                                        |
 
 ## Usage
 
@@ -107,10 +108,10 @@ Each stack exports its outputs under predictable names:
   - `${SystemName}-${EnvType}-ec2-windows-instance`
   - `${SystemName}-${EnvType}-ec2-windows-instance-private-ip`
   - `${SystemName}-${EnvType}-ec2-windows-instance-public-ip`
-- `ec2-ubuntu.cfn.yml`
-  - `${SystemName}-${EnvType}-ec2-ubuntu-instance`
-  - `${SystemName}-${EnvType}-ec2-ubuntu-instance-private-ip`
-  - `${SystemName}-${EnvType}-ec2-ubuntu-instance-public-ip`
+- `ec2-linux.cfn.yml`
+  - `${SystemName}-${EnvType}-ec2-linux-instance`
+  - `${SystemName}-${EnvType}-ec2-linux-instance-private-ip`
+  - `${SystemName}-${EnvType}-ec2-linux-instance-public-ip`
 
 Both EC2 templates still import the same shared VPC and IAM exports, but their EC2
 export names and instance `Name` tags are now OS-specific. If you deploy both variants for the same
@@ -128,10 +129,10 @@ Deploy the Windows stack:
 aws cloudformation deploy --template-file ec2-windows.cfn.yml --stack-name min-dev-ec2
 ```
 
-Deploy the Ubuntu stack:
+Deploy the Linux stack:
 
 ```bash
-aws cloudformation deploy --template-file ec2-ubuntu.cfn.yml --stack-name min-dev-ec2
+aws cloudformation deploy --template-file ec2-linux.cfn.yml --stack-name min-dev-ec2
 ```
 
 If you need to pin different existing resources, you can still supply explicit overrides:
@@ -146,10 +147,12 @@ your chosen EC2 template so the expected exports exist.
 
 If you previously deployed the older layout where IAM lived in `ec2.cfn.yml`, plan a staged migration or stack recreation before adopting this split because the IAM role and instance profile now belong to `iam.cfn.yml`.
 
-Set `Ec2UserData` only when you want to replace the built-in bootstrap script:
+Set `Ec2UserData` only when you want CloudFormation to pass custom instance initialization commands:
 
-- For `ec2-windows.cfn.yml`, custom values should provide a complete Windows UserData script, including the `<powershell>...</powershell>` wrapper and a `cfn-signal.exe` call so the stack can satisfy the instance `CreationPolicy`.
-- For `ec2-ubuntu.cfn.yml`, custom values should provide a complete shell UserData script, including a `#!/bin/bash` header and a `cfn-signal` call so the stack can satisfy the instance `CreationPolicy`.
+- For `ec2-windows.cfn.yml`, provide a complete Windows UserData payload in the format you want the instance to receive.
+- For `ec2-linux.cfn.yml`, provide the shell script content you want CloudFormation to base64-encode and pass as `UserData`.
+
+Neither EC2 template defines a `CreationPolicy` or appends a `cfn-signal` step, so stack completion does not wait for `UserData` execution to finish.
 
 After the EC2 stack is created, start a Session Manager session using the AWS CLI:
 

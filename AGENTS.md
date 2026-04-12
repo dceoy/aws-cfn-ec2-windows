@@ -2,7 +2,7 @@
 
 ## Overview
 
-The main deliverables are [`vpc.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/vpc.cfn.yml), [`iam.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/iam.cfn.yml), [`ec2-windows.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/ec2-windows.cfn.yml), and [`ec2-ubuntu.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/ec2-ubuntu.cfn.yml). The VPC template provisions the VPC, subnet, routing, and security prerequisites, the IAM template creates the EC2 role and instance profile, and the EC2 templates launch either a Windows Server or Ubuntu instance with Session Manager access using those existing resources.
+The main deliverables are [`vpc.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/vpc.cfn.yml), [`iam.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/iam.cfn.yml), [`ec2-windows.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/ec2-windows.cfn.yml), and [`ec2-linux.cfn.yml`](/Users/dceoy/util/aws-cfn-ec2-minimal/ec2-linux.cfn.yml). The VPC template provisions the VPC, subnet, routing, and security prerequisites, the IAM template creates the EC2 role and instance profile, and the EC2 templates launch either a Windows Server or Amazon ECS-optimized Amazon Linux 2023 arm64 instance with Session Manager access using those existing resources.
 
 ## Deployment Instructions
 
@@ -12,7 +12,7 @@ Use the AWS CLI to deploy or update the stacks:
 aws cloudformation deploy --template-file vpc.cfn.yml --stack-name min-dev-ec2-vpc
 aws cloudformation deploy --template-file iam.cfn.yml --stack-name min-dev-ec2-iam --capabilities CAPABILITY_NAMED_IAM
 aws cloudformation deploy --template-file ec2-windows.cfn.yml --stack-name min-dev-ec2 --parameter-overrides Ec2SubnetId=<subnet-id> Ec2SecurityGroupId=<security-group-id> Ec2IamInstanceProfileName=<instance-profile-name>
-aws cloudformation deploy --template-file ec2-ubuntu.cfn.yml --stack-name min-dev-ec2 --parameter-overrides Ec2SubnetId=<subnet-id> Ec2SecurityGroupId=<security-group-id> Ec2IamInstanceProfileName=<instance-profile-name>
+aws cloudformation deploy --template-file ec2-linux.cfn.yml --stack-name min-dev-ec2 --parameter-overrides Ec2SubnetId=<subnet-id> Ec2SecurityGroupId=<security-group-id> Ec2IamInstanceProfileName=<instance-profile-name>
 ```
 
 Both EC2 templates reuse the same shared imports, but they now publish OS-specific EC2 output export names. If you deploy both for the same `${SystemName}-${EnvType}`, use different CloudFormation stack names.

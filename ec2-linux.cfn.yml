@@ -51,7 +51,7 @@ Parameters:
   Ec2LinuxAmiId:
     Description: >-
       SSM parameter path for the Amazon ECS-optimized Amazon Linux 2023 AMI ID.
-      Defaults to the latest recommended ECS-optimized Amazon Linux 2023 AMI.
+      Defaults to the latest recommended ECS-optimized Amazon Linux 2023 x86_64 AMI.
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/ecs/optimized-ami/amazon-linux-2023/recommended/image_id
   Ec2VolumeSize:
@@ -69,22 +69,16 @@ Parameters:
       - gp2
   Ec2UserData:
     Description: >-
-      EC2 UserData script.
-      Defaults to the built-in shell bootstrap and should leave user_data_exit_code
-      set when custom error handling is used.
+      Optional EC2 UserData shell script.
+      Leave empty to omit UserData.
     Type: String
-    Default: |
-      #!/bin/bash
-      set -euox pipefail
-      for i in {1..10}; do
-        if dnf -y upgrade && dnf -y autoremove && dnf -y clean all; then
-          exit 0
-        else
-          sleep $((2 ** i))
-        fi
-      done
-    NoEcho: true
+    Default: ''
 Conditions:
+  HasEc2UserDataOverride:
+    Fn::Not:
+      - Fn::Equals:
+          - !Ref Ec2UserData
+          - ''
   HasEc2SubnetIdOverride:
     Fn::Not:
       - Fn::Equals:
@@ -109,7 +103,7 @@ Resources:
         skip:
           - id: CKV_AWS_88
             comment: >-
-              Public IP is required for internet access during the default UserData bootstrap.
+              Public IP keeps this minimal template usable without NAT or VPC endpoints.
               Inbound access is blocked by the security group (no ingress rules).
     Properties:
       ImageId: !Ref Ec2LinuxAmiId
@@ -143,8 +137,10 @@ Resources:
             VolumeType: !Ref Ec2VolumeType
             Encrypted: true
             DeleteOnTermination: true
-      UserData:
-        Fn::Base64: !Ref Ec2UserData
+      UserData: !If
+        - HasEc2UserDataOverride
+        - Fn::Base64: !Ref Ec2UserData
+        - !Ref AWS::NoValue
       Tags:
         - Key: Name
           Value: !Sub "${SystemName}-${EnvType}-ec2-linux-instance"
@@ -152,9 +148,6 @@ Resources:
           Value: !Ref SystemName
         - Key: EnvType
           Value: !Ref EnvType
-    CreationPolicy:
-      ResourceSignal:
-        Timeout: PT30M
 Outputs:
   Ec2InstanceId:
     Description: EC2 instance ID

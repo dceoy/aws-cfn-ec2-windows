@@ -69,12 +69,16 @@ Parameters:
       - gp2
   Ec2UserData:
     Description: >-
-      Optional EC2 UserData script to use instead of the default bootstrap.
-      Leave empty to keep the built-in PowerShell bootstrap behavior.
+      Optional EC2 UserData script.
+      Leave empty to omit UserData.
     Type: String
     Default: ''
-    NoEcho: true
 Conditions:
+  HasEc2UserDataOverride:
+    Fn::Not:
+      - Fn::Equals:
+          - !Ref Ec2UserData
+          - ''
   HasEc2SubnetIdOverride:
     Fn::Not:
       - Fn::Equals:
@@ -99,7 +103,7 @@ Resources:
         skip:
           - id: CKV_AWS_88
             comment: >-
-              Public IP is required for internet access during the default UserData bootstrap.
+              Public IP keeps this minimal template usable without NAT or VPC endpoints.
               Inbound access is blocked by the security group (no ingress rules).
     Properties:
       ImageId: !Ref Ec2WindowsAmiId
@@ -133,8 +137,10 @@ Resources:
             VolumeType: !Ref Ec2VolumeType
             Encrypted: true
             DeleteOnTermination: true
-      UserData:
-        Fn::Base64: !Ref Ec2UserData
+      UserData: !If
+        - HasEc2UserDataOverride
+        - !Ref Ec2UserData
+        - !Ref AWS::NoValue
       Tags:
         - Key: Name
           Value: !Sub "${SystemName}-${EnvType}-ec2-windows-instance"
@@ -142,9 +148,6 @@ Resources:
           Value: !Ref SystemName
         - Key: EnvType
           Value: !Ref EnvType
-    CreationPolicy:
-      ResourceSignal:
-        Timeout: PT30M
 Outputs:
   Ec2InstanceId:
     Description: EC2 instance ID
